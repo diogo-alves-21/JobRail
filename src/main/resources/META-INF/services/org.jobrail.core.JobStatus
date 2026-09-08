@@ -1,0 +1,5 @@
+org.jobrail.core.jobstatuses.Pending
+org.jobrail.core.jobstatuses.Processing
+org.jobrail.core.jobstatuses.Succeeded
+org.jobrail.core.jobstatuses.Failed
+org.jobrail.core.jobstatuses.Dead
