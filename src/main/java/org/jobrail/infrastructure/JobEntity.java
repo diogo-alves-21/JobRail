@@ -6,10 +6,8 @@
 package org.jobrail.infrastructure;
 
 import jakarta.persistence.*;
-
 import java.time.Instant;
 import java.util.UUID;
-
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -30,7 +28,7 @@ public class JobEntity {
     @Id
     @UuidGenerator(style = UuidGenerator.Style.VERSION_7)
     @Column(name = "id")
-    private UUID uuid;
+    private UUID id;
 
     @Column(name = "type", nullable = false)
     private String type;
