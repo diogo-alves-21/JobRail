@@ -5,7 +5,7 @@
 */
 package org.jobrail.core;
 
-public interface JobStatus {
+    public interface JobStatus {
 
     String getName();
 }
