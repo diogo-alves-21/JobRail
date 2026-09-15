@@ -3,9 +3,7 @@
 * JobRail - Distributed Job Queue
 * All rights reserved.
 */
-package org.jobrail.core;
+package org.jobrail.api.dto;
 
-public interface JobStatus {
-
-    String getName();
+public record EnqueueJobDTO() {
 }
