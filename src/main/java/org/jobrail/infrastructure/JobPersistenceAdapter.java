@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.jobrail.core.Job;
 import org.jobrail.core.JobRepository;
 import org.jobrail.core.JobStatus;
+import org.jobrail.core.jobstatuses.Pending;
 
 import java.util.List;
 import java.util.Optional;

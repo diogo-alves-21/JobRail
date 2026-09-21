@@ -14,11 +14,9 @@ import org.jobrail.core.Job;
 import org.jobrail.core.JobStatus;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import java.lang.annotation.RetentionPolicy;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
