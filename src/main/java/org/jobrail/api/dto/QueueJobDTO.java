@@ -7,6 +7,8 @@ package org.jobrail.api.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
-public record EnqueueJobDTO(@NotBlank String type, @NotBlank String payload, @Min(1) int maxAttempts) {
+public record QueueJobDTO(@NotNull @NotBlank String type, @NotNull @NotBlank String payload,
+                          @Min(1) int maxAttempts) {
 }

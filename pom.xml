@@ -198,6 +198,7 @@
                             <version>4.26</version>
                             <file>${project.basedir}/eclipse-formatter.xml</file>
                         </eclipse>
+                        <removeUnusedImports/>
                         <licenseHeader>
                             <content>/*
 * Copyright (c) $YEAR Diogo Alves
