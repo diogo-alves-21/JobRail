@@ -16,4 +16,6 @@ public interface JobRepository {
     List<Job> listJobsByStatus(JobStatus status);
 
     Job store(Job job);
+
+    List<Job> process(List<Job> jobs);
 }
