@@ -7,7 +7,6 @@ package org.jobrail.infrastructure;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import groovy.transform.Trait;
 import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -16,13 +15,10 @@ import org.jobrail.core.JobStatus;
 import org.jobrail.core.jobstatuses.Failed;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

@@ -51,10 +51,9 @@ public class JobPersistenceAdapter implements JobRepository {
     @Transactional(Transactional.TxType.MANDATORY)
     public List<Job> process(List<Job> jobs) {
         List<UUID> ids = jobs.stream().map(Job::id).toList();
-        List<JobEntity> entities = repositoryBase.getEntityManager().createQuery(
-                "FROM JobEntity WHERE id IN :ids AND status = :status", JobEntity.class)
-                .setParameter("ids", ids)
-                .setParameter("status", Pending.provider())
+        List<JobEntity> entities = repositoryBase.getEntityManager()
+                .createQuery("FROM JobEntity WHERE id IN :ids AND status = :status", JobEntity.class)
+                .setParameter("ids", ids).setParameter("status", Pending.provider())
                 .setLockMode(LockModeType.PESSIMISTIC_WRITE).setHint("jakarta.persistence.lock.timeout", -2)
                 .getResultList();
 
