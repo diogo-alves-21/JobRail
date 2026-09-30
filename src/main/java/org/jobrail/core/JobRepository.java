@@ -18,4 +18,8 @@ public interface JobRepository {
     Job store(Job job);
 
     List<Job> process(List<Job> jobs);
+
+    void markSucceeded(UUID id, int attempts);
+
+    void markFailed(UUID id);
 }
