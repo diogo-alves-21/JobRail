@@ -13,12 +13,14 @@ import org.jobrail.core.jobstatuses.Pending;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 @ApplicationScoped
 @RequiredArgsConstructor
 public class JobProcessor {
 
     private final JobRepository jobRepository;
+    private final JobHandlerRegistry registry;
 
     @Scheduled(every = "5s")
     @Transactional
@@ -33,6 +35,14 @@ public class JobProcessor {
         if (processedJobs.isEmpty())
             return;
 
+        processedJobs.forEach(job -> {
+            JobHandler handler = registry.getHandler(job.type().toUpperCase(Locale.ROOT));
+            int attempts = handler.handleJob(job);
+            if (attempts <= job.maxAttempts()) {
+                jobRepository.markSucceeded(job.id(), attempts);
+            } else {
+                jobRepository.markFailed(job.id());
+            }
+        });
     }
-
 }

@@ -13,8 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.jobrail.core.Job;
 import org.jobrail.core.JobRepository;
 import org.jobrail.core.JobStatus;
+import org.jobrail.core.jobstatuses.Failed;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
+import org.jobrail.core.jobstatuses.Succeeded;
 
 import java.time.Instant;
 import java.util.List;
@@ -39,8 +41,8 @@ public class JobPersistenceAdapter implements JobRepository {
         return repositoryBase.find("status = ?1", status).stream().map(jobMapper::toDomain).toList();
     }
 
-    @Transactional
     @Override
+    @Transactional(Transactional.TxType.REQUIRED)
     public Job store(Job job) {
         JobEntity entity = jobMapper.toEntity(job);
         repositoryBase.persist(entity);
@@ -63,5 +65,23 @@ public class JobPersistenceAdapter implements JobRepository {
         });
 
         return entities.stream().map(jobMapper::toDomain).toList();
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public void markSucceeded(UUID id, int attempts) {
+        JobEntity job = repositoryBase.findById(id);
+        job.setStatus(Succeeded.provider());
+        job.setCurrentAttempts(attempts);
+        job.setUpdatedAt(Instant.now());
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public void markFailed(UUID id) {
+        JobEntity job = repositoryBase.findById(id);
+        job.setStatus(Failed.provider());
+        job.setCurrentAttempts(job.getMaxAttempts());
+        job.setUpdatedAt(Instant.now());
     }
 }
