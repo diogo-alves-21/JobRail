@@ -26,7 +26,7 @@ public class JobProcessor {
     @Transactional
     public void process() {
 
-        List<Job> jobs = jobRepository.listJobsByStatus(Pending.provider());
+        List<Job> jobs = jobRepository.listJobsByStatus(Pending.getInstance());
         jobs = jobs.stream().filter(j -> j.runAfter().compareTo(Instant.now()) < 0).toList();
         if (jobs.isEmpty())
             return;

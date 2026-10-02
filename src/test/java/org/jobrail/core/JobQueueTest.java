@@ -7,6 +7,7 @@ package org.jobrail.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.jobrail.core.exceptions.QueueJobException;
@@ -30,6 +31,7 @@ public class JobQueueTest {
     JobPersistenceAdapter jobPersistenceAdapter;
 
     @Test
+    @TestTransaction
     void pendingJob_queueJob_persistJob() {
         Instant before = Instant.now();
         UUID jobId = jobQueue.queue("email", "{}", 3);
@@ -43,22 +45,25 @@ public class JobQueueTest {
         assertEquals(0, job.get().currentAttempts());
         assertFalse(job.get().runAfter().isBefore(before));
         assertFalse(job.get().runAfter().isAfter(after));
-        assertEquals(Pending.provider(), job.get().status());
+        assertEquals(Pending.getInstance(), job.get().status());
     }
 
     @Test
+    @TestTransaction
     void emptyType_queueJob_throwsException() {
         QueueJobException exception = assertThrows(QueueJobException.class, () -> jobQueue.queue("", "{}", 3));
         assertEquals("Job type can't be empty", exception.getMessage());
     }
 
     @Test
+    @TestTransaction
     void emptyPayload_queueJob_throwsException() {
         QueueJobException exception = assertThrows(QueueJobException.class, () -> jobQueue.queue("email", "", 3));
         assertEquals("Job payload can't be empty", exception.getMessage());
     }
 
     @Test
+    @TestTransaction
     void maxAttemptsSmallerThanOne_queueJob_throwsException() {
         QueueJobException exception = assertThrows(QueueJobException.class, () -> jobQueue.queue("email", "{}", 0));
         assertEquals("Job must run at least 1 time", exception.getMessage());

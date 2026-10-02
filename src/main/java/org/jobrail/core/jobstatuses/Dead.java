@@ -19,7 +19,7 @@ public class Dead implements JobStatus {
         return "DEAD";
     }
 
-    public static Dead provider() {
+    public static Dead getInstance() {
         return INSTANCE;
     }
 }

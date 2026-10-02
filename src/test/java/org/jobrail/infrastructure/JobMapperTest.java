@@ -27,7 +27,7 @@ public class JobMapperTest {
         entity.setId(UUID.randomUUID());
         entity.setType("email");
         entity.setPayload("{}");
-        entity.setStatus(Pending.provider());
+        entity.setStatus(Pending.getInstance());
         entity.setCurrentAttempts(0);
         entity.setMaxAttempts(10);
 
@@ -49,7 +49,7 @@ public class JobMapperTest {
                         UUID.randomUUID(),
                         "email",
                         "{}",
-                        Pending.provider(),
+                        Pending.getInstance(),
                         0,
                         10,
                         Instant.now(),

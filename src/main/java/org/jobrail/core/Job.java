@@ -9,6 +9,6 @@ public record Job(UUID id, String type, String payload, JobStatus status, int cu
                   int maxAttempts, Instant runAfter, Instant createdAt, Instant updatedAt) {
 
     public static Job newPending(String type, String payload, int maxAttempts){
-        return new Job(null, type, payload, Pending.provider(), 0, maxAttempts, Instant.now(), Instant.now(), Instant.now());
+        return new Job(null, type, payload, Pending.getInstance(), 0, maxAttempts, Instant.now(), Instant.now(), Instant.now());
     }
 }

@@ -19,7 +19,7 @@ public class Failed implements JobStatus {
         return "FAILED";
     }
 
-    public static Failed provider() {
+    public static Failed getInstance() {
         return INSTANCE;
     }
 }
