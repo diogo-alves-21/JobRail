@@ -19,7 +19,7 @@ public class Processing implements JobStatus {
         return "PROCESSING";
     }
 
-    public static Processing provider(){
+    public static Processing getInstance(){
         return INSTANCE;
     }
 }

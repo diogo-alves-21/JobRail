@@ -33,7 +33,7 @@ public class JobPersistenceAdapterTest {
     @Test
     @TestTransaction
     void validEntityId_findByIdOptional_returnJob() {
-        Job job = createJob("email", Pending.provider());
+        Job job = createJob("email", Pending.getInstance());
         UUID jobId = jobPersistenceAdapter.store(job).id();
 
         Optional<Job> result = jobPersistenceAdapter.findByIdOptional(jobId);
@@ -50,42 +50,42 @@ public class JobPersistenceAdapterTest {
     @Test
     @TestTransaction
     void jobStatus_listJobsByStatus_returnJobList() {
-        jobPersistenceAdapter.store(createJob("email", Pending.provider()));
-        jobPersistenceAdapter.store(createJob("notification", Pending.provider()));
+        jobPersistenceAdapter.store(createJob("email", Pending.getInstance()));
+        jobPersistenceAdapter.store(createJob("notification", Pending.getInstance()));
 
-        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.provider());
+        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
         assertEquals(2, jobs.size());
     }
 
     @Test
     @TestTransaction
     void jobStatus_listJobsByStatus_returnEmptyList() {
-        jobPersistenceAdapter.store(createJob("email", Pending.provider()));
-        jobPersistenceAdapter.store(createJob("notification", Pending.provider()));
+        jobPersistenceAdapter.store(createJob("email", Pending.getInstance()));
+        jobPersistenceAdapter.store(createJob("notification", Pending.getInstance()));
 
-        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Processing.provider());
+        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Processing.getInstance());
         assertTrue(jobs.isEmpty());
     }
 
     @Test
     @TestTransaction
     void jobsList_process_updateJobEntity() {
-        Job emailJob = createJob("email", Pending.provider());
-        Job notJob = createJob("notification", Pending.provider());
+        Job emailJob = createJob("email", Pending.getInstance());
+        Job notJob = createJob("notification", Pending.getInstance());
         jobPersistenceAdapter.store(emailJob);
         jobPersistenceAdapter.store(notJob);
-        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.provider());
+        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
         List<Job> processedJobs = jobPersistenceAdapter.process(jobs);
-        assertEquals(processedJobs.getFirst().status(), Processing.provider());
-        assertEquals(processedJobs.get(1).status(), Processing.provider());
+        assertEquals(processedJobs.getFirst().status(), Processing.getInstance());
+        assertEquals(processedJobs.get(1).status(), Processing.getInstance());
     }
 
     @Test
     @TestTransaction
     void jobsListWithDifferentStatus_process_returnEmptyList() {
-        Job emailJob = createJob("email", Failed.provider());
+        Job emailJob = createJob("email", Failed.getInstance());
         jobPersistenceAdapter.store(emailJob);
-        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.provider());
+        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
         List<Job> processedJobs = jobPersistenceAdapter.process(jobs);
         assertTrue(processedJobs.isEmpty());
     }

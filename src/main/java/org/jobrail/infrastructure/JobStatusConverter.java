@@ -3,7 +3,7 @@ package org.jobrail.infrastructure;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import org.jobrail.core.JobStatus;
-import org.jobrail.core.JobStatuses;
+import org.jobrail.core.JobStatusRegistry;
 
 @Converter
 public class JobStatusConverter implements AttributeConverter<JobStatus, String> {
@@ -16,6 +16,6 @@ public class JobStatusConverter implements AttributeConverter<JobStatus, String>
     @Override
     public JobStatus convertToEntityAttribute(String value) {
 
-        return value == null ? null : JobStatuses.fromName(value);
+        return value == null ? null : JobStatusRegistry.fromName(value);
     }
 }

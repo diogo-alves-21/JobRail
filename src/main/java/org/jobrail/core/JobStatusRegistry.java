@@ -11,19 +11,19 @@ import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
 import org.jobrail.core.jobstatuses.Succeeded;
 
-public final class JobStatuses {
+public final class JobStatusRegistry {
 
-    private static final Map<String, JobStatus> BY_NAME =
+    private static final Map<String, JobStatus> statusMap =
             Stream.of(
-                            Pending.provider(),
-                            Processing.provider(),
-                            Succeeded.provider(),
-                            Failed.provider(),
-                            Dead.provider())
+                            Pending.getInstance(),
+                            Processing.getInstance(),
+                            Succeeded.getInstance(),
+                            Failed.getInstance(),
+                            Dead.getInstance())
                     .collect(Collectors.toUnmodifiableMap(JobStatus::getName, Function.identity()));
 
     public static JobStatus fromName(String name) {
-        JobStatus status = BY_NAME.get(name);
+        JobStatus status = statusMap.get(name);
 
         if (status == null) throw new IllegalArgumentException("Unknown job status: " + name);
         return status;

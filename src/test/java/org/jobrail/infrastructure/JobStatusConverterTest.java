@@ -15,7 +15,7 @@ public class JobStatusConverterTest {
 
     @Test
     void status_convertToDatabaseColumn_returnsStatusName(){
-        JobStatus status = Pending.provider();
+        JobStatus status = Pending.getInstance();
         String name = jobStatusConverter.convertToDatabaseColumn(status);
         assertEquals(status.getName(), name);
     }

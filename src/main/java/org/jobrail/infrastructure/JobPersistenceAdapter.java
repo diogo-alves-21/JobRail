@@ -55,12 +55,12 @@ public class JobPersistenceAdapter implements JobRepository {
         List<UUID> ids = jobs.stream().map(Job::id).toList();
         List<JobEntity> entities = repositoryBase.getEntityManager()
                 .createQuery("FROM JobEntity WHERE id IN :ids AND status = :status", JobEntity.class)
-                .setParameter("ids", ids).setParameter("status", Pending.provider())
+                .setParameter("ids", ids).setParameter("status", Pending.getInstance())
                 .setLockMode(LockModeType.PESSIMISTIC_WRITE).setHint("jakarta.persistence.lock.timeout", -2)
                 .getResultList();
 
         entities.forEach(entity -> {
-            entity.setStatus(Processing.provider());
+            entity.setStatus(Processing.getInstance());
             entity.setUpdatedAt(Instant.now());
         });
 
@@ -71,7 +71,7 @@ public class JobPersistenceAdapter implements JobRepository {
     @Transactional(Transactional.TxType.MANDATORY)
     public void markSucceeded(UUID id, int attempts) {
         JobEntity job = repositoryBase.findById(id);
-        job.setStatus(Succeeded.provider());
+        job.setStatus(Succeeded.getInstance());
         job.setCurrentAttempts(attempts);
         job.setUpdatedAt(Instant.now());
     }
@@ -80,7 +80,7 @@ public class JobPersistenceAdapter implements JobRepository {
     @Transactional(Transactional.TxType.MANDATORY)
     public void markFailed(UUID id) {
         JobEntity job = repositoryBase.findById(id);
-        job.setStatus(Failed.provider());
+        job.setStatus(Failed.getInstance());
         job.setCurrentAttempts(job.getMaxAttempts());
         job.setUpdatedAt(Instant.now());
     }

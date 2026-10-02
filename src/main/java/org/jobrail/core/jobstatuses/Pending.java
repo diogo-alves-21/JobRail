@@ -19,7 +19,7 @@ public class Pending implements JobStatus {
         return "PENDING";
     }
 
-    public static Pending provider() {
+    public static Pending getInstance() {
         return INSTANCE;
     }
 }

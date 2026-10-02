@@ -19,7 +19,7 @@ public class Succeeded implements JobStatus {
         return "SUCCEEDED";
     }
 
-    public static Succeeded provider() {
+    public static Succeeded getInstance() {
         return INSTANCE;
     }
 }
