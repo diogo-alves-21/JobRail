@@ -4,6 +4,7 @@
 * All rights reserved.
 */
 package org.jobrail.core.jobhandlers;
+
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.extern.java.Log;
 import org.jobrail.core.Job;
