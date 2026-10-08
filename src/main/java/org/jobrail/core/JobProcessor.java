@@ -51,10 +51,9 @@ public class JobProcessor {
     private void reclaimStuckJob(Job job) {
         int nextAttempt = job.currentAttempts() + 1;
         if (nextAttempt <= job.maxAttempts()) {
-            jobRepository.rescheduleIfStuck(job.id(), job.updatedAt(),
-                    Instant.now().plus(Backoff.runAfter(nextAttempt)));
+            jobRepository.reschedule(job.id(), job.updatedAt(), Instant.now().plus(Backoff.runAfter(nextAttempt)));
         } else {
-            jobRepository.markDeadIfStuck(job.id(), job.updatedAt());
+            jobRepository.markDead(job.id(), job.updatedAt());
         }
     }
 
@@ -62,23 +61,23 @@ public class JobProcessor {
         claimedJobs.forEach(this::handleEachJob);
     }
 
-    private void handleEachJob(Job job) {
-        int attempt = jobRepository.updateAttempts(job.id());
+    private void handleEachJob(Job claimedJob) {
+        Job job = jobRepository.updateAttempts(claimedJob.id());
         try {
             JobHandler handler = registry.getHandler(job.type().toUpperCase(Locale.ROOT));
             handler.handleJob(job);
             jobRepository.markSucceeded(job.id());
         } catch (HandleJobException _) {
-            handleFailedJob(job, attempt);
+            handleFailedJob(job);
         }
     }
 
-    private void handleFailedJob(Job job, int attempt) {
-        if (attempt < job.maxAttempts()) {
-            Instant runAfter = Instant.now().plus(Backoff.runAfter(attempt));
-            jobRepository.reschedule(job.id(), runAfter);
+    private void handleFailedJob(Job job) {
+        if (job.currentAttempts() < job.maxAttempts()) {
+            Instant runAfter = Instant.now().plus(Backoff.runAfter(job.currentAttempts()));
+            jobRepository.reschedule(job.id(), job.updatedAt(), runAfter);
         } else {
-            jobRepository.markDead(job.id());
+            jobRepository.markDead(job.id(), job.updatedAt());
         }
     }
 }

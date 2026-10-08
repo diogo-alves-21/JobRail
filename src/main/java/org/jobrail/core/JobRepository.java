@@ -22,13 +22,9 @@ public interface JobRepository {
 
     void markSucceeded(UUID id);
 
-    void reschedule(UUID id, Instant runAfter);
+    void reschedule(UUID id, Instant updatedAt, Instant runAfter);
 
-    boolean rescheduleIfStuck(UUID id, Instant seenUpdatedAt, Instant runAfter);
+    void markDead(UUID id, Instant updatedAt);
 
-    void markDead(UUID id);
-
-    boolean markDeadIfStuck(UUID id, Instant seenUpdatedAt);
-
-    int updateAttempts(UUID id);
+    Job updateAttempts(UUID id);
 }
