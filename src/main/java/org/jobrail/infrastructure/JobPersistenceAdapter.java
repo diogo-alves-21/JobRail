@@ -13,10 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.jobrail.core.Job;
 import org.jobrail.core.JobRepository;
 import org.jobrail.core.JobStatus;
-import org.jobrail.core.jobstatuses.Failed;
-import org.jobrail.core.jobstatuses.Pending;
-import org.jobrail.core.jobstatuses.Processing;
-import org.jobrail.core.jobstatuses.Succeeded;
+import org.jobrail.core.jobstatuses.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -50,8 +47,8 @@ public class JobPersistenceAdapter implements JobRepository {
     }
 
     @Override
-    @Transactional(Transactional.TxType.MANDATORY)
-    public List<Job> process(List<Job> jobs) {
+    @Transactional(Transactional.TxType.REQUIRED)
+    public List<Job> claim(List<Job> jobs) {
         List<UUID> ids = jobs.stream().map(Job::id).toList();
         List<JobEntity> entities = repositoryBase.getEntityManager()
                 .createQuery("FROM JobEntity WHERE id IN :ids AND status = :status", JobEntity.class)
@@ -68,20 +65,63 @@ public class JobPersistenceAdapter implements JobRepository {
     }
 
     @Override
-    @Transactional(Transactional.TxType.MANDATORY)
-    public void markSucceeded(UUID id, int attempts) {
+    @Transactional(Transactional.TxType.REQUIRED)
+    public void markSucceeded(UUID id) {
         JobEntity job = repositoryBase.findById(id);
         job.setStatus(Succeeded.getInstance());
-        job.setCurrentAttempts(attempts);
         job.setUpdatedAt(Instant.now());
     }
 
     @Override
-    @Transactional(Transactional.TxType.MANDATORY)
-    public void markFailed(UUID id) {
+    @Transactional(Transactional.TxType.REQUIRED)
+    public void reschedule(UUID id, Instant runAfter) {
         JobEntity job = repositoryBase.findById(id);
-        job.setStatus(Failed.getInstance());
+        job.setStatus(Pending.getInstance());
+        job.setRunAfter(runAfter);
+        job.setUpdatedAt(Instant.now());
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.REQUIRED)
+    public boolean rescheduleIfStuck(UUID id, Instant seenUpdatedAt, Instant runAfter) {
+        int updated = repositoryBase.getEntityManager().createQuery("""
+                UPDATE JobEntity
+                SET status = :pending, runAfter = :runAfter, updatedAt = :now
+                WHERE id = :id AND status = :processing AND updatedAt = :seen
+                """).setParameter("pending", Pending.getInstance()).setParameter("processing", Processing.getInstance())
+                .setParameter("runAfter", runAfter).setParameter("now", Instant.now()).setParameter("id", id)
+                .setParameter("seen", seenUpdatedAt).executeUpdate();
+        return updated == 1;
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.REQUIRED)
+    public void markDead(UUID id) {
+        JobEntity job = repositoryBase.findById(id);
+        job.setStatus(Dead.getInstance());
         job.setCurrentAttempts(job.getMaxAttempts());
         job.setUpdatedAt(Instant.now());
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.REQUIRED)
+    public boolean markDeadIfStuck(UUID id, Instant seenUpdatedAt) {
+        int updated = repositoryBase.getEntityManager().createQuery("""
+                UPDATE JobEntity
+                SET status = :dead, currentAttempts = maxAttempts, updatedAt = :now
+                WHERE id = :id AND status = :processing AND updatedAt = :seen
+                """).setParameter("dead", Dead.getInstance()).setParameter("processing", Processing.getInstance())
+                .setParameter("now", Instant.now()).setParameter("id", id).setParameter("seen", seenUpdatedAt)
+                .executeUpdate();
+        return updated == 1;
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.REQUIRED)
+    public int updateAttempts(UUID id) {
+        JobEntity job = repositoryBase.findById(id);
+        job.setCurrentAttempts(job.getCurrentAttempts() + 1);
+        job.setUpdatedAt(Instant.now());
+        return job.getCurrentAttempts();
     }
 }

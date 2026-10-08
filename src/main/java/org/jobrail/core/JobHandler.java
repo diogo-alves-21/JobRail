@@ -9,5 +9,5 @@ public interface JobHandler {
 
     String supportedType();
 
-    int handleJob(Job job);
+    void handleJob(Job job);
 }
