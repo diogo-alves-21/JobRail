@@ -1,0 +1,13 @@
+/*
+* Copyright (c) 2026 Diogo Alves
+* JobRail - Distributed Job Queue
+* All rights reserved.
+*/
+package org.jobrail.core.exceptions;
+
+public class HandleJobException extends RuntimeException {
+
+    public HandleJobException(String message) {
+        super(message);
+    }
+}

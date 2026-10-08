@@ -5,6 +5,7 @@
 */
 package org.jobrail.core;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,9 +18,17 @@ public interface JobRepository {
 
     Job store(Job job);
 
-    List<Job> process(List<Job> jobs);
+    List<Job> claim(List<Job> jobs);
 
-    void markSucceeded(UUID id, int attempts);
+    void markSucceeded(UUID id);
 
-    void markFailed(UUID id);
+    void reschedule(UUID id, Instant runAfter);
+
+    boolean rescheduleIfStuck(UUID id, Instant seenUpdatedAt, Instant runAfter);
+
+    void markDead(UUID id);
+
+    boolean markDeadIfStuck(UUID id, Instant seenUpdatedAt);
+
+    int updateAttempts(UUID id);
 }
