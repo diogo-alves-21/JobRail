@@ -16,6 +16,7 @@ import org.jobrail.core.JobStatus;
 import org.jobrail.core.jobstatuses.*;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -74,54 +75,34 @@ public class JobPersistenceAdapter implements JobRepository {
 
     @Override
     @Transactional(Transactional.TxType.REQUIRED)
-    public void reschedule(UUID id, Instant runAfter) {
-        JobEntity job = repositoryBase.findById(id);
-        job.setStatus(Pending.getInstance());
-        job.setRunAfter(runAfter);
-        job.setUpdatedAt(Instant.now());
-    }
-
-    @Override
-    @Transactional(Transactional.TxType.REQUIRED)
-    public boolean rescheduleIfStuck(UUID id, Instant seenUpdatedAt, Instant runAfter) {
-        int updated = repositoryBase.getEntityManager().createQuery("""
+    public void reschedule(UUID id, Instant seenUpdatedAt, Instant runAfter) {
+        repositoryBase.getEntityManager().createQuery("""
                 UPDATE JobEntity
                 SET status = :pending, runAfter = :runAfter, updatedAt = :now
                 WHERE id = :id AND status = :processing AND updatedAt = :seen
                 """).setParameter("pending", Pending.getInstance()).setParameter("processing", Processing.getInstance())
                 .setParameter("runAfter", runAfter).setParameter("now", Instant.now()).setParameter("id", id)
                 .setParameter("seen", seenUpdatedAt).executeUpdate();
-        return updated == 1;
     }
 
     @Override
     @Transactional(Transactional.TxType.REQUIRED)
-    public void markDead(UUID id) {
-        JobEntity job = repositoryBase.findById(id);
-        job.setStatus(Dead.getInstance());
-        job.setCurrentAttempts(job.getMaxAttempts());
-        job.setUpdatedAt(Instant.now());
-    }
-
-    @Override
-    @Transactional(Transactional.TxType.REQUIRED)
-    public boolean markDeadIfStuck(UUID id, Instant seenUpdatedAt) {
-        int updated = repositoryBase.getEntityManager().createQuery("""
+    public void markDead(UUID id, Instant seenUpdatedAt) {
+        repositoryBase.getEntityManager().createQuery("""
                 UPDATE JobEntity
                 SET status = :dead, currentAttempts = maxAttempts, updatedAt = :now
                 WHERE id = :id AND status = :processing AND updatedAt = :seen
                 """).setParameter("dead", Dead.getInstance()).setParameter("processing", Processing.getInstance())
                 .setParameter("now", Instant.now()).setParameter("id", id).setParameter("seen", seenUpdatedAt)
                 .executeUpdate();
-        return updated == 1;
     }
 
     @Override
     @Transactional(Transactional.TxType.REQUIRED)
-    public int updateAttempts(UUID id) {
+    public Job updateAttempts(UUID id) {
         JobEntity job = repositoryBase.findById(id);
         job.setCurrentAttempts(job.getCurrentAttempts() + 1);
-        job.setUpdatedAt(Instant.now());
-        return job.getCurrentAttempts();
+        job.setUpdatedAt(Instant.now().truncatedTo(ChronoUnit.MICROS));
+        return jobMapper.toDomain(job);
     }
 }
