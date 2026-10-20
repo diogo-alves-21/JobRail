@@ -9,6 +9,7 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.RequiredArgsConstructor;
 import org.jobrail.core.exceptions.HandleJobException;
+import org.jobrail.core.exceptions.HandleNotFoundJobException;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
 
@@ -65,6 +66,10 @@ public class JobProcessor {
         Job job = jobRepository.updateAttempts(claimedJob.id());
         try {
             JobHandler handler = registry.getHandler(job.type().toUpperCase(Locale.ROOT));
+            if (handler == null) {
+                jobRepository.markDead(job.id(), job.updatedAt());
+                return;
+            }
             handler.handleJob(job);
             jobRepository.markSucceeded(job.id());
         } catch (HandleJobException _) {

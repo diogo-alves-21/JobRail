@@ -75,7 +75,7 @@ public class JobPersistenceAdapterTest {
         jobPersistenceAdapter.store(emailJob);
         jobPersistenceAdapter.store(notJob);
         List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
-        List<Job> processedJobs = jobPersistenceAdapter.process(jobs);
+        List<Job> processedJobs = jobPersistenceAdapter.claim(jobs);
         assertEquals(processedJobs.getFirst().status(), Processing.getInstance());
         assertEquals(processedJobs.get(1).status(), Processing.getInstance());
     }
@@ -86,15 +86,29 @@ public class JobPersistenceAdapterTest {
         Job emailJob = createJob("email", Failed.getInstance());
         jobPersistenceAdapter.store(emailJob);
         List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
-        List<Job> processedJobs = jobPersistenceAdapter.process(jobs);
+        List<Job> processedJobs = jobPersistenceAdapter.claim(jobs);
         assertTrue(processedJobs.isEmpty());
     }
 
     @Test
     @TestTransaction
     void emptyJobList_process_returnEmptyList() {
-        List<Job> processedJobs = jobPersistenceAdapter.process(List.of());
+        List<Job> processedJobs = jobPersistenceAdapter.claim(List.of());
         assertTrue(processedJobs.isEmpty());
+    }
+
+    @Test
+    @TestTransaction
+    void claimedJob_updateAttempts_refreshesLeaseTimestamp() {
+        Instant old = Instant.now().minusSeconds(120);
+        Job staleJob = new Job(null, "email", "{}", Processing.getInstance(), 0, 10, old, old, old);
+        UUID id = jobPersistenceAdapter.store(staleJob).id();
+
+        jobPersistenceAdapter.updateAttempts(id);
+
+        Job result = jobPersistenceAdapter.findByIdOptional(id).orElseThrow();
+        assertEquals(1, result.currentAttempts());
+        assertTrue(result.updatedAt().isAfter(old.plusSeconds(60)));
     }
 
     private Job createJob(String type, JobStatus status) {

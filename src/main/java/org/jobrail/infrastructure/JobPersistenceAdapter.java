@@ -92,7 +92,8 @@ public class JobPersistenceAdapter implements JobRepository {
                 UPDATE JobEntity
                 SET status = :dead, currentAttempts = maxAttempts, updatedAt = :now
                 WHERE id = :id AND status = :processing AND updatedAt = :seen
-                """).setParameter("dead", Dead.getInstance()).setParameter("processing", Processing.getInstance())
+                """).setParameter("dead", Dead.getInstance())
+                .setParameter("processing", Processing.getInstance())
                 .setParameter("now", Instant.now()).setParameter("id", id).setParameter("seen", seenUpdatedAt)
                 .executeUpdate();
     }
