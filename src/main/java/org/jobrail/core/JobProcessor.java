@@ -9,7 +9,6 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.RequiredArgsConstructor;
 import org.jobrail.core.exceptions.HandleJobException;
-import org.jobrail.core.exceptions.HandleNotFoundJobException;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
 

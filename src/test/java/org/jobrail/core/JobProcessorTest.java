@@ -45,7 +45,7 @@ class JobProcessorTest {
 
         processor.process();
 
-        verify(handler, times(1)).handleJob(withAttempts(job,1));
+        verify(handler, times(1)).handleJob(withAttempts(job, 1));
         verify(repository, times(1)).markSucceeded(job.id());
         verify(repository, never()).markDead(any(), any());
     }
