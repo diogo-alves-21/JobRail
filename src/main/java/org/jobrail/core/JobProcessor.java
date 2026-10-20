@@ -65,6 +65,10 @@ public class JobProcessor {
         Job job = jobRepository.updateAttempts(claimedJob.id());
         try {
             JobHandler handler = registry.getHandler(job.type().toUpperCase(Locale.ROOT));
+            if (handler == null) {
+                jobRepository.markDead(job.id(), job.updatedAt());
+                return;
+            }
             handler.handleJob(job);
             jobRepository.markSucceeded(job.id());
         } catch (HandleJobException _) {
