@@ -5,13 +5,15 @@
 */
 package org.jobrail.api;
 
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
 import org.jobrail.api.dto.QueueJobDTO;
-import org.jobrail.core.JobQueue;
+import org.jobrail.core.*;
+import org.jobrail.core.queries.GetJob;
+import org.jobrail.core.queries.ListJobs;
 
+import java.util.List;
 import java.util.UUID;
 
 @Path("/api/jobs")
@@ -19,11 +21,27 @@ import java.util.UUID;
 public class JobResource {
 
     private final JobQueue jobQueue;
+    private final GetJob getJob;
+    private final ListJobs listJobs;
 
     @POST
     @Path("")
     public Response queueJob(QueueJobDTO jobDTO) {
         UUID jobId = jobQueue.queue(jobDTO.type(), jobDTO.payload(), jobDTO.maxAttempts());
         return Response.ok(jobId).build();
+    }
+
+    @GET
+    @Path("/{id}")
+    public Response getJob(@PathParam("id") UUID id) {
+        Job job = getJob.query(id);
+        return Response.ok(job).build();
+    }
+
+    @GET
+    @Path("")
+    public Response listJobs(@QueryParam("status") String status) {
+        List<Job> jobs = listJobs.query(status);
+        return Response.ok(jobs).build();
     }
 }

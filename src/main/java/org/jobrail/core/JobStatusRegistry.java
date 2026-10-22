@@ -1,31 +1,33 @@
+/*
+* Copyright (c) 2026 Diogo Alves
+* JobRail - Distributed Job Queue
+* All rights reserved.
+*/
 package org.jobrail.core;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.jobrail.core.jobstatuses.Dead;
-import org.jobrail.core.jobstatuses.Failed;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
 import org.jobrail.core.jobstatuses.Succeeded;
 
 public final class JobStatusRegistry {
 
-    private static final Map<String, JobStatus> statusMap =
-            Stream.of(
-                            Pending.getInstance(),
-                            Processing.getInstance(),
-                            Succeeded.getInstance(),
-                            Failed.getInstance(),
-                            Dead.getInstance())
-                    .collect(Collectors.toUnmodifiableMap(JobStatus::getName, Function.identity()));
+    private static final Map<String, JobStatus> statusMap = Stream
+            .of(Pending.getInstance(), Processing.getInstance(), Succeeded.getInstance(), Dead.getInstance())
+            .collect(Collectors.toUnmodifiableMap(JobStatus::getName, Function.identity()));
 
     public static JobStatus fromName(String name) {
-        JobStatus status = statusMap.get(name);
+        if (name == null) {
+            throw new IllegalArgumentException("Job status can't be null");
+        }
 
-        if (status == null) throw new IllegalArgumentException("Unknown job status: " + name);
-        return status;
+        return Optional.ofNullable(statusMap.get(name))
+                .orElseThrow(() -> new IllegalArgumentException("Unknown job status: " + name));
     }
 }
