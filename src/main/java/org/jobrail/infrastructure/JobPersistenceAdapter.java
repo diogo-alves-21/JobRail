@@ -36,7 +36,7 @@ public class JobPersistenceAdapter implements JobRepository {
 
     @Override
     public List<Job> listJobsByStatus(JobStatus status) {
-        return repositoryBase.find("status = ?1", status).stream().map(jobMapper::toDomain).toList();
+        return repositoryBase.find("status = ?1 or ?1 is null", status).stream().map(jobMapper::toDomain).toList();
     }
 
     @Override

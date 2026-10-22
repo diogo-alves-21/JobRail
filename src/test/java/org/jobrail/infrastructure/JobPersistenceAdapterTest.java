@@ -12,7 +12,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.jobrail.core.Job;
 import org.jobrail.core.JobStatus;
-import org.jobrail.core.jobstatuses.Failed;
+import org.jobrail.core.jobstatuses.Dead;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
 import org.junit.jupiter.api.Tag;
@@ -83,7 +83,7 @@ public class JobPersistenceAdapterTest {
     @Test
     @TestTransaction
     void jobsListWithDifferentStatus_process_returnEmptyList() {
-        Job emailJob = createJob("email", Failed.getInstance());
+        Job emailJob = createJob("email", Dead.getInstance());
         jobPersistenceAdapter.store(emailJob);
         List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
         List<Job> processedJobs = jobPersistenceAdapter.claim(jobs);
