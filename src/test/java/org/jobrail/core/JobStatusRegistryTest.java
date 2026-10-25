@@ -5,6 +5,7 @@
 */
 package org.jobrail.core;
 
+import org.jobrail.core.exceptions.InvalidJobStatusException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,7 @@ public class JobStatusRegistryTest {
 
     @Test
     void invalidName_fromName_throwsException() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        InvalidJobStatusException exception = assertThrows(InvalidJobStatusException.class,
                 () -> JobStatusRegistry.fromName("INVALID_STATUS"));
 
         assertEquals("Unknown job status: INVALID_STATUS", exception.getMessage());
@@ -30,7 +31,7 @@ public class JobStatusRegistryTest {
 
     @Test
     void null_fromName_throwsException() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        InvalidJobStatusException exception = assertThrows(InvalidJobStatusException.class,
                 () -> JobStatusRegistry.fromName(null));
 
         assertEquals("Job status can't be null", exception.getMessage());

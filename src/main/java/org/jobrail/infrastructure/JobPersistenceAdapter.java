@@ -35,6 +35,11 @@ public class JobPersistenceAdapter implements JobRepository {
     }
 
     @Override
+    public Optional<Job> findByIdAndStatusOptional(UUID id, JobStatus status) {
+        return repositoryBase.find("id = ?1 and status = ?2", id, status).stream().map(jobMapper::toDomain).findFirst();
+    }
+
+    @Override
     public List<Job> listJobsByStatus(JobStatus status) {
         return repositoryBase.find("status = ?1 or ?1 is null", status).stream().map(jobMapper::toDomain).toList();
     }
@@ -104,5 +109,15 @@ public class JobPersistenceAdapter implements JobRepository {
         job.setCurrentAttempts(job.getCurrentAttempts() + 1);
         job.setUpdatedAt(Instant.now().truncatedTo(ChronoUnit.MICROS));
         return jobMapper.toDomain(job);
+    }
+
+    @Override
+    @Transactional(Transactional.TxType.REQUIRED)
+    public void updateForRequeue(UUID id) {
+        JobEntity jobEntity = repositoryBase.findById(id);
+        jobEntity.setCurrentAttempts(0);
+        jobEntity.setStatus(Pending.getInstance());
+        jobEntity.setRunAfter(Instant.now());
+        jobEntity.setUpdatedAt(Instant.now());
     }
 }
