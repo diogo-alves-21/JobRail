@@ -23,6 +23,7 @@ public class JobResource {
     private final JobQueue jobQueue;
     private final GetJob getJob;
     private final ListJobs listJobs;
+    private final JobRequeue jobRequeue;
 
     @POST
     @Path("")
@@ -43,5 +44,12 @@ public class JobResource {
     public Response listJobs(@QueryParam("status") String status) {
         List<Job> jobs = listJobs.query(status);
         return Response.ok(jobs).build();
+    }
+
+    @POST
+    @Path("/{id}/retry")
+    public Response requeueJob(@PathParam("id") UUID id) {
+        UUID jobId = jobRequeue.requeue(id);
+        return Response.ok(jobId).build();
     }
 }

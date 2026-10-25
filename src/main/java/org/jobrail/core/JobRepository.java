@@ -14,6 +14,8 @@ public interface JobRepository {
 
     Optional<Job> findByIdOptional(UUID id);
 
+    Optional<Job> findByIdAndStatusOptional(UUID id, JobStatus status);
+
     List<Job> listJobsByStatus(JobStatus status);
 
     Job store(Job job);
@@ -27,4 +29,6 @@ public interface JobRepository {
     void markDead(UUID id, Instant updatedAt);
 
     Job updateAttempts(UUID id);
+
+    void updateForRequeue(UUID id);
 }

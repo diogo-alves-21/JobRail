@@ -11,6 +11,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.jobrail.core.exceptions.InvalidJobStatusException;
 import org.jobrail.core.jobstatuses.Dead;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
@@ -24,10 +25,9 @@ public final class JobStatusRegistry {
 
     public static JobStatus fromName(String name) {
         if (name == null) {
-            throw new IllegalArgumentException("Job status can't be null");
+            throw new InvalidJobStatusException(null);
         }
 
-        return Optional.ofNullable(statusMap.get(name))
-                .orElseThrow(() -> new IllegalArgumentException("Unknown job status: " + name));
+        return Optional.ofNullable(statusMap.get(name)).orElseThrow(() -> new InvalidJobStatusException(name));
     }
 }
