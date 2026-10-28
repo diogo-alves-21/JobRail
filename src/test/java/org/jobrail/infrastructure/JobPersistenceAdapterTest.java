@@ -15,10 +15,12 @@ import org.jobrail.core.JobStatus;
 import org.jobrail.core.jobstatuses.Dead;
 import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
+import org.jobrail.core.jobstatuses.Succeeded;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,32 +71,84 @@ public class JobPersistenceAdapterTest {
 
     @Test
     @TestTransaction
-    void jobsList_process_updateJobEntity() {
-        Job emailJob = createJob("email", Pending.getInstance());
-        Job notJob = createJob("notification", Pending.getInstance());
-        jobPersistenceAdapter.store(emailJob);
-        jobPersistenceAdapter.store(notJob);
-        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
-        List<Job> processedJobs = jobPersistenceAdapter.claim(jobs);
-        assertEquals(processedJobs.getFirst().status(), Processing.getInstance());
-        assertEquals(processedJobs.get(1).status(), Processing.getInstance());
+    void severalDueJobs_claimNext_claimsOnlyTheOldestOne() {
+        Job oldest = jobPersistenceAdapter.store(jobDueAt(Pending.getInstance(), secondsAgo(300)));
+        Job middle = jobPersistenceAdapter.store(jobDueAt(Pending.getInstance(), secondsAgo(200)));
+        Job newest = jobPersistenceAdapter.store(jobDueAt(Pending.getInstance(), secondsAgo(100)));
+
+        List<Job> claimed = jobPersistenceAdapter.claimNext();
+
+        assertEquals(1, claimed.size());
+        assertEquals(oldest.id(), claimed.getFirst().id());
+        assertEquals(Processing.getInstance(), claimed.getFirst().status());
+        List<UUID> stillPending = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance()).stream().map(Job::id)
+                .toList();
+        assertEquals(2, stillPending.size());
+        assertTrue(stillPending.containsAll(List.of(middle.id(), newest.id())));
     }
 
     @Test
     @TestTransaction
-    void jobsListWithDifferentStatus_process_returnEmptyList() {
-        Job emailJob = createJob("email", Dead.getInstance());
-        jobPersistenceAdapter.store(emailJob);
-        List<Job> jobs = jobPersistenceAdapter.listJobsByStatus(Pending.getInstance());
-        List<Job> processedJobs = jobPersistenceAdapter.claim(jobs);
-        assertTrue(processedJobs.isEmpty());
+    void claimedJob_claimNext_refreshesUpdatedAt() {
+        Instant old = secondsAgo(120);
+        Job stale = jobPersistenceAdapter
+                .store(new Job(null, "email", "{}", Pending.getInstance(), 0, 3, old, old, old));
+
+        Job claimed = jobPersistenceAdapter.claimNext().getFirst();
+
+        assertEquals(stale.id(), claimed.id());
+        assertTrue(claimed.updatedAt().isAfter(old.plusSeconds(60)));
     }
 
     @Test
     @TestTransaction
-    void emptyJobList_process_returnEmptyList() {
-        List<Job> processedJobs = jobPersistenceAdapter.claim(List.of());
-        assertTrue(processedJobs.isEmpty());
+    void calledRepeatedly_claimNext_handsOutEachJobOnceThenRunsDry() {
+        Job first = jobPersistenceAdapter.store(jobDueAt(Pending.getInstance(), secondsAgo(200)));
+        Job second = jobPersistenceAdapter.store(jobDueAt(Pending.getInstance(), secondsAgo(100)));
+
+        assertEquals(first.id(), jobPersistenceAdapter.claimNext().getFirst().id());
+        assertEquals(second.id(), jobPersistenceAdapter.claimNext().getFirst().id());
+        assertTrue(jobPersistenceAdapter.claimNext().isEmpty());
+    }
+
+    @Test
+    @TestTransaction
+    void noJobs_claimNext_returnsEmpty() {
+        assertTrue(jobPersistenceAdapter.claimNext().isEmpty());
+    }
+
+    @Test
+    @TestTransaction
+    void onlyNotYetDueJob_claimNext_returnsEmptyAndLeavesItPending() {
+        Job future = jobPersistenceAdapter
+                .store(jobDueAt(Pending.getInstance(), Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.MICROS)));
+
+        assertTrue(jobPersistenceAdapter.claimNext().isEmpty());
+
+        assertEquals(Pending.getInstance(), jobPersistenceAdapter.findByIdOptional(future.id()).orElseThrow().status());
+    }
+
+    @Test
+    @TestTransaction
+    void dueJobsInOtherStatuses_claimNext_returnsEmpty() {
+        jobPersistenceAdapter.store(jobDueAt(Dead.getInstance(), secondsAgo(100)));
+        jobPersistenceAdapter.store(jobDueAt(Succeeded.getInstance(), secondsAgo(100)));
+        jobPersistenceAdapter.store(jobDueAt(Processing.getInstance(), secondsAgo(100)));
+
+        assertTrue(jobPersistenceAdapter.claimNext().isEmpty());
+    }
+
+    @Test
+    @TestTransaction
+    void dueJobBehindNotYetDueJob_claimNext_skipsTheNotYetDueOne() {
+        jobPersistenceAdapter
+                .store(jobDueAt(Pending.getInstance(), Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.MICROS)));
+        Job due = jobPersistenceAdapter.store(jobDueAt(Pending.getInstance(), secondsAgo(10)));
+
+        List<Job> claimed = jobPersistenceAdapter.claimNext();
+
+        assertEquals(1, claimed.size());
+        assertEquals(due.id(), claimed.getFirst().id());
     }
 
     @Test
@@ -114,5 +168,14 @@ public class JobPersistenceAdapterTest {
     private Job createJob(String type, JobStatus status) {
         Instant now = Instant.now();
         return new Job(null, type, "{}", status, 0, 10, now, now, now);
+    }
+
+    private Job jobDueAt(JobStatus status, Instant runAfter) {
+        Instant created = secondsAgo(600);
+        return new Job(null, "email", "{}", status, 0, 3, runAfter, created, created);
+    }
+
+    private static Instant secondsAgo(long seconds) {
+        return Instant.now().minusSeconds(seconds).truncatedTo(ChronoUnit.MICROS);
     }
 }

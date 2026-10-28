@@ -16,7 +16,7 @@ import org.jobrail.core.jobstatuses.Processing;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
+import org.mockito.stubbing.OngoingStubbing;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -31,41 +31,30 @@ class JobProcessorTest {
     private final JobHandler handler = mock(JobHandler.class);
     private final JobProcessor processor = new JobProcessor(repository, registry);
 
+    // ---- claimAndRunOnce: outcome of a single claimed job -------------------------------------------
+
     @Test
-    void handlerSucceeds_process_jobIsMarkedAsSucceededOneTime() {
-        int maxAttempts = 3;
-        Instant past = Instant.now().minusSeconds(60);
-        Job job = new Job(UUID.randomUUID(), "EMAIL", "{}", Pending.getInstance(), 0, maxAttempts, past, past, past);
+    void handlerSucceeds_claimAndRunOnce_jobIsMarkedAsSucceededOneTime() {
+        Job job = pendingJob(3);
+        stubFlow(job, withAttempts(job, 1));
 
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(job));
-        when(repository.claim(any())).thenReturn(List.of(job));
-        when(repository.updateAttempts(job.id())).thenReturn(withAttempts(job, 1));
-        when(registry.getHandler("EMAIL")).thenReturn(handler);
-
-        processor.process();
+        assertTrue(processor.claimAndRunOnce());
 
         verify(handler, times(1)).handleJob(withAttempts(job, 1));
         verify(repository, times(1)).markSucceeded(job.id());
+        verify(repository, never()).reschedule(any(), any(), any());
         verify(repository, never()).markDead(any(), any());
     }
 
     @Test
-    void alwaysFailingHandler_process_deadAfterExactlyMaxAttempts() {
+    void alwaysFailingHandler_claimAndRunOnce_deadAfterExactlyMaxAttempts() {
         int maxAttempts = 3;
-        Instant past = Instant.now().minusSeconds(60);
-        Job job = new Job(UUID.randomUUID(), "email", "{}", Pending.getInstance(), 0, maxAttempts, past, past, past);
-
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(job));
-        when(repository.claim(any())).thenReturn(List.of(job));
-        when(repository.updateAttempts(job.id())).thenReturn(withAttempts(job, 1), withAttempts(job, 2),
-                withAttempts(job, 3));
-        when(registry.getHandler("EMAIL")).thenReturn(handler);
+        Job job = pendingJob(maxAttempts);
+        stubFlow(job, withAttempts(job, 1), withAttempts(job, 2), withAttempts(job, 3));
         doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
         for (int pass = 0; pass < maxAttempts; pass++) {
-            processor.process();
+            processor.claimAndRunOnce();
         }
 
         verify(handler, times(maxAttempts)).handleJob(any());
@@ -75,20 +64,13 @@ class JobProcessorTest {
     }
 
     @Test
-    void handlerFailsOnce_process_jobIsMarkedAsSucceededAfterOneFailure() {
-        int maxAttempts = 3;
-        Instant past = Instant.now().minusSeconds(60);
-        Job job = new Job(UUID.randomUUID(), "email", "{}", Pending.getInstance(), 0, maxAttempts, past, past, past);
-
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(job));
-        when(repository.claim(any())).thenReturn(List.of(job));
-        when(repository.updateAttempts(job.id())).thenReturn(withAttempts(job, 1), withAttempts(job, 2));
-        when(registry.getHandler("EMAIL")).thenReturn(handler);
+    void handlerFailsOnce_claimAndRunOnce_jobIsMarkedAsSucceededAfterOneFailure() {
+        Job job = pendingJob(3);
+        stubFlow(job, withAttempts(job, 1), withAttempts(job, 2));
         doThrow(new HandleJobException("boom")).doNothing().when(handler).handleJob(any());
 
-        processor.process();
-        processor.process();
+        processor.claimAndRunOnce();
+        processor.claimAndRunOnce();
 
         verify(handler, times(2)).handleJob(any());
         verify(repository, times(1)).reschedule(eq(job.id()), any(), any());
@@ -102,7 +84,7 @@ class JobProcessorTest {
         stubFlow(job, withAttempts(job, 1));
         doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
-        processor.process();
+        processor.claimAndRunOnce();
 
         verify(repository, times(1)).markDead(eq(job.id()), any());
         verify(repository, never()).reschedule(any(), any(), any());
@@ -110,40 +92,40 @@ class JobProcessorTest {
     }
 
     @Test
-    void failureBeforeLastAttempt_process_reschedulesInsteadOfDead() {
+    void failureBeforeLastAttempt_claimAndRunOnce_reschedulesInsteadOfDead() {
         Job job = pendingJob(3);
         stubFlow(job, withAttempts(job, 2));
         doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
-        processor.process();
+        processor.claimAndRunOnce();
 
         verify(repository, times(1)).reschedule(eq(job.id()), any(), any());
         verify(repository, never()).markDead(any(), any());
     }
 
     @Test
-    void failureOnLastAttempt_process_marksDeadInsteadOfReschedule() {
+    void failureOnLastAttempt_claimAndRunOnce_marksDeadInsteadOfReschedule() {
         Job job = pendingJob(3);
         stubFlow(job, withAttempts(job, 3));
         doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
-        processor.process();
+        processor.claimAndRunOnce();
 
         verify(repository, times(1)).markDead(eq(job.id()), any());
         verify(repository, never()).reschedule(any(), any(), any());
     }
 
     @Test
-    void failures_process_rescheduleWithGrowingBackoff() {
+    void failures_claimAndRunOnce_rescheduleWithGrowingBackoff() {
         Job job = pendingJob(5);
         stubFlow(job, withAttempts(job, 1), withAttempts(job, 2));
         doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
         Instant beforeFirst = Instant.now();
-        processor.process();
+        processor.claimAndRunOnce();
         Instant afterFirst = Instant.now();
         Instant beforeSecond = Instant.now();
-        processor.process();
+        processor.claimAndRunOnce();
         Instant afterSecond = Instant.now();
 
         ArgumentCaptor<Instant> runAfter = ArgumentCaptor.forClass(Instant.class);
@@ -159,136 +141,101 @@ class JobProcessorTest {
     }
 
     @Test
-    void failure_process_reschedulesWithUpdatedAtFromUpdateAttempts() {
+    void failure_claimAndRunOnce_reschedulesWithUpdatedAtFromUpdateAttempts() {
         Job job = pendingJob(3);
         Job fresh = withAttempts(job, 1, Instant.now().truncatedTo(ChronoUnit.MICROS));
         stubFlow(job, fresh);
         doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
-        processor.process();
+        processor.claimAndRunOnce();
 
         verify(repository, times(1)).reschedule(eq(job.id()), eq(fresh.updatedAt()), any());
     }
 
     @Test
-    void exhaustedAttempts_process_marksDeadWithUpdatedAtFromUpdateAttempts() {
+    void exhaustedAttempts_claimAndRunOnce_marksDeadWithUpdatedAtFromUpdateAttempts() {
         Job job = pendingJob(1);
         Job fresh = withAttempts(job, 1, Instant.now().truncatedTo(ChronoUnit.MICROS));
         stubFlow(job, fresh);
         doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
-        processor.process();
+        processor.claimAndRunOnce();
 
         verify(repository, times(1)).markDead(eq(job.id()), eq(fresh.updatedAt()));
     }
 
     @Test
-    void noPendingJobs_process_nothingIsClaimedOrHandled() {
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of());
+    void failedJob_claimAndRunOnce_stillReportsThatWorkWasDone() {
+        Job job = pendingJob(3);
+        stubFlow(job, withAttempts(job, 1));
+        doThrow(new HandleJobException("boom")).when(handler).handleJob(any());
 
-        processor.process();
+        assertTrue(processor.claimAndRunOnce());
+    }
 
-        verify(repository, never()).claim(any());
-        verify(repository, never()).updateAttempts(any());
+    // ---- claimAndRunOnce: nothing to claim ----------------------------------------------------------
+
+    @Test
+    void nothingToClaim_claimAndRunOnce_returnsFalseAndTouchesNothing() {
+        when(repository.claimNext()).thenReturn(List.of());
+
+        assertFalse(processor.claimAndRunOnce());
+
+        verify(repository, times(1)).claimNext();
+        verifyNoMoreInteractions(repository);
         verifyNoInteractions(handler);
     }
 
     @Test
-    void notYetDueJob_process_isNotClaimed() {
-        Job notDue = pendingJobDueAt(Instant.now().plusSeconds(60));
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(notDue));
+    void anyOutcome_claimAndRunOnce_doesNotScanForStuckJobs() {
+        Job job = pendingJob(3);
+        stubFlow(job, withAttempts(job, 1));
 
-        processor.process();
+        processor.claimAndRunOnce();
 
-        verify(repository, never()).claim(any());
-        verify(repository, never()).updateAttempts(any());
-        verifyNoInteractions(handler);
+        verify(repository, never()).listJobsByStatus(any());
     }
 
-    @Test
-    void dueAndNotDueJobs_process_onlyTheDueJobIsClaimedAndHandled() {
-        Job due = pendingJobDueAt(Instant.now().minusSeconds(60));
-        Job notDue = pendingJobDueAt(Instant.now().plusSeconds(60));
-        Job dueFresh = withAttempts(due, 1);
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(due, notDue));
-        when(repository.claim(List.of(due))).thenReturn(List.of(due));
-        when(repository.updateAttempts(due.id())).thenReturn(dueFresh);
-        when(registry.getHandler("EMAIL")).thenReturn(handler);
-
-        processor.process();
-
-        verify(repository, times(1)).claim(List.of(due));
-        verify(repository, never()).updateAttempts(notDue.id());
-        verify(handler, times(1)).handleJob(dueFresh);
-        verify(repository, times(1)).markSucceeded(due.id());
-        verify(repository, never()).markSucceeded(notDue.id());
-    }
+    // ---- claimAndRunOnce: one job per call, so a bad job must not affect the next call --------------
 
     @Test
-    void claimReturnsEmpty_process_nothingIsHandled() {
-        Job due = pendingJobDueAt(Instant.now().minusSeconds(60));
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(due));
-        when(repository.claim(any())).thenReturn(List.of());
-
-        processor.process();
-
-        verify(repository, times(1)).claim(List.of(due));
-        verify(repository, never()).updateAttempts(any());
-        verify(repository, never()).markSucceeded(any());
-        verify(repository, never()).reschedule(any(), any(), any());
-        verify(repository, never()).markDead(any(), any());
-        verifyNoInteractions(handler);
-    }
-
-    @Test
-    void oneJobFailsInBatch_process_otherJobsAreStillHandled() {
-        Job first = pendingJob(3);
+    void oneJobFails_claimAndRunOnce_nextCallStillHandlesTheNextJob() {
         Job failing = pendingJob(3);
-        Job last = pendingJob(3);
-        Job firstFresh = withAttempts(first, 1);
+        Job next = pendingJob(3);
         Job failingFresh = withAttempts(failing, 1);
-        Job lastFresh = withAttempts(last, 1);
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(first, failing, last));
-        when(repository.claim(any())).thenReturn(List.of(first, failing, last));
-        when(repository.updateAttempts(first.id())).thenReturn(firstFresh);
+        Job nextFresh = withAttempts(next, 1);
+        stubClaimSequence(failing, next);
         when(repository.updateAttempts(failing.id())).thenReturn(failingFresh);
-        when(repository.updateAttempts(last.id())).thenReturn(lastFresh);
+        when(repository.updateAttempts(next.id())).thenReturn(nextFresh);
         when(registry.getHandler("EMAIL")).thenReturn(handler);
         doThrow(new HandleJobException("boom")).when(handler).handleJob(failingFresh);
 
-        processor.process();
+        processor.claimAndRunOnce();
+        processor.claimAndRunOnce();
 
-        verify(handler, times(3)).handleJob(any());
-        verify(repository, times(1)).markSucceeded(first.id());
-        verify(repository, times(1)).markSucceeded(last.id());
-        verify(repository, never()).markSucceeded(failing.id());
         verify(repository, times(1)).reschedule(eq(failing.id()), eq(failingFresh.updatedAt()), any());
-        verify(repository, never()).reschedule(eq(first.id()), any(), any());
-        verify(repository, never()).reschedule(eq(last.id()), any(), any());
+        verify(repository, never()).markSucceeded(failing.id());
+        verify(handler, times(1)).handleJob(nextFresh);
+        verify(repository, times(1)).markSucceeded(next.id());
+        verify(repository, never()).reschedule(eq(next.id()), any(), any());
         verify(repository, never()).markDead(any(), any());
     }
 
     @Test
-    void jobsOfDifferentTypes_process_eachGoesToItsOwnHandler() {
+    void jobsOfDifferentTypes_claimAndRunOnce_eachGoesToItsOwnHandler() {
         JobHandler paymentHandler = mock(JobHandler.class);
         Job email = pendingJobOfType("email");
         Job payment = pendingJobOfType("Payment");
         Job emailFresh = withAttempts(email, 1);
         Job paymentFresh = withAttempts(payment, 1);
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(email, payment));
-        when(repository.claim(any())).thenReturn(List.of(email, payment));
+        stubClaimSequence(email, payment);
         when(repository.updateAttempts(email.id())).thenReturn(emailFresh);
         when(repository.updateAttempts(payment.id())).thenReturn(paymentFresh);
         when(registry.getHandler("EMAIL")).thenReturn(handler);
         when(registry.getHandler("PAYMENT")).thenReturn(paymentHandler);
 
-        processor.process();
+        processor.claimAndRunOnce();
+        processor.claimAndRunOnce();
 
         verify(handler, times(1)).handleJob(emailFresh);
         verify(handler, never()).handleJob(paymentFresh);
@@ -298,82 +245,16 @@ class JobProcessorTest {
         verify(repository, times(1)).markSucceeded(payment.id());
     }
 
-    @Test
-    void processingJobWithinTimeout_process_isLeftAlone() {
-        Job healthy = processingJob(1, 3, Instant.now().minusSeconds(10));
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(healthy));
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of());
-
-        processor.process();
-
-        verify(repository, never()).reschedule(any(), any(), any());
-        verify(repository, never()).markDead(any(), any());
-    }
+    // ---- claimAndRunOnce: missing handler -----------------------------------------------------------
 
     @Test
-    void stuckJobWithAttemptsLeft_process_isRescheduledWithBackoffAndGuard() {
-        Job stuck = processingJob(1, 3, Instant.now().minusSeconds(120));
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(stuck));
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of());
-
-        Instant before = Instant.now();
-        processor.process();
-        Instant after = Instant.now();
-
-        ArgumentCaptor<Instant> runAfter = ArgumentCaptor.forClass(Instant.class);
-        verify(repository, times(1)).reschedule(eq(stuck.id()), eq(stuck.updatedAt()), runAfter.capture());
-        assertFalse(runAfter.getValue().isBefore(before.plus(Backoff.runAfter(2))));
-        assertFalse(runAfter.getValue().isAfter(after.plus(Backoff.runAfter(2))));
-        verify(repository, never()).markDead(any(), any());
-    }
-
-    @Test
-    void stuckJobWithAttemptsExhausted_process_isMarkedDeadWithGuard() {
-        Job stuck = processingJob(3, 3, Instant.now().minusSeconds(120));
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(stuck));
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of());
-
-        processor.process();
-
-        verify(repository, times(1)).markDead(stuck.id(), stuck.updatedAt());
-        verify(repository, never()).reschedule(any(), any(), any());
-    }
-
-    @Test
-    void stuckJobAndEmptyPendingQueue_process_stillReclaimsTheStuckJob() {
-        Job stuck = processingJob(1, 3, Instant.now().minusSeconds(120));
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(stuck));
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of());
-
-        processor.process();
-
-        verify(repository, times(1)).reschedule(eq(stuck.id()), any(), any());
-        verify(repository, never()).claim(any());
-    }
-
-    @Test
-    void stuckJobAndDuePendingJob_process_reclaimsBeforeClaiming() {
-        Job stuck = processingJob(1, 3, Instant.now().minusSeconds(120));
-        Job due = pendingJobDueAt(Instant.now().minusSeconds(60));
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(stuck));
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(due));
-        when(repository.claim(any())).thenReturn(List.of());
-
-        processor.process();
-
-        InOrder order = inOrder(repository);
-        order.verify(repository).reschedule(eq(stuck.id()), any(), any());
-        order.verify(repository).claim(List.of(due));
-    }
-
-    @Test
-    void noHandlerRegisteredForType_process_jobIsMarkedDeadImmediately() {
+    void noHandlerRegisteredForType_claimAndRunOnce_jobIsMarkedDeadImmediately() {
         Job job = pendingJobOfType("unknown");
         Job fresh = withAttempts(job, 1, Instant.now().truncatedTo(ChronoUnit.MICROS));
         stubFlow(job, fresh);
         when(registry.getHandler("UNKNOWN")).thenReturn(null);
 
-        processor.process();
+        assertTrue(processor.claimAndRunOnce());
 
         verify(registry, times(1)).getHandler("UNKNOWN");
         verify(repository, times(1)).markDead(job.id(), fresh.updatedAt());
@@ -383,26 +264,92 @@ class JobProcessorTest {
     }
 
     @Test
-    void noHandlerForOneJobInBatch_process_otherJobsAreStillHandled() {
+    void noHandlerForOneJob_claimAndRunOnce_nextCallStillHandlesTheNextJob() {
         Job unknown = pendingJobOfType("unknown");
         Job email = pendingJobOfType("email");
         Job unknownFresh = withAttempts(unknown, 1);
         Job emailFresh = withAttempts(email, 1);
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(unknown, email));
-        when(repository.claim(any())).thenReturn(List.of(unknown, email));
+        stubClaimSequence(unknown, email);
         when(repository.updateAttempts(unknown.id())).thenReturn(unknownFresh);
         when(repository.updateAttempts(email.id())).thenReturn(emailFresh);
         when(registry.getHandler("UNKNOWN")).thenReturn(null);
         when(registry.getHandler("EMAIL")).thenReturn(handler);
 
-        processor.process();
+        processor.claimAndRunOnce();
+        processor.claimAndRunOnce();
 
         verify(repository, times(1)).markDead(eq(unknown.id()), any());
         verify(handler, times(1)).handleJob(emailFresh);
         verify(repository, times(1)).markSucceeded(email.id());
         verify(repository, never()).markDead(eq(email.id()), any());
     }
+
+    // ---- reclaimStuckJobs ---------------------------------------------------------------------------
+
+    @Test
+    void processingJobWithinTimeout_reclaimStuckJobs_isLeftAlone() {
+        Job healthy = processingJob(1, 3, Instant.now().minusSeconds(10));
+        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(healthy));
+
+        processor.reclaimStuckJobs();
+
+        verify(repository, never()).reschedule(any(), any(), any());
+        verify(repository, never()).markDead(any(), any());
+    }
+
+    @Test
+    void stuckJobWithAttemptsLeft_reclaimStuckJobs_isRescheduledWithBackoffAndGuard() {
+        Job stuck = processingJob(1, 3, Instant.now().minusSeconds(120));
+        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(stuck));
+
+        Instant before = Instant.now();
+        processor.reclaimStuckJobs();
+        Instant after = Instant.now();
+
+        ArgumentCaptor<Instant> runAfter = ArgumentCaptor.forClass(Instant.class);
+        verify(repository, times(1)).reschedule(eq(stuck.id()), eq(stuck.updatedAt()), runAfter.capture());
+        // the crashed attempt is already counted in currentAttempts, so the next one is currentAttempts + 1
+        assertFalse(runAfter.getValue().isBefore(before.plus(Backoff.runAfter(2))));
+        assertFalse(runAfter.getValue().isAfter(after.plus(Backoff.runAfter(2))));
+        verify(repository, never()).markDead(any(), any());
+    }
+
+    @Test
+    void stuckJobWithAttemptsExhausted_reclaimStuckJobs_isMarkedDeadWithGuard() {
+        Job stuck = processingJob(3, 3, Instant.now().minusSeconds(120));
+        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(stuck));
+
+        processor.reclaimStuckJobs();
+
+        verify(repository, times(1)).markDead(stuck.id(), stuck.updatedAt());
+        verify(repository, never()).reschedule(any(), any(), any());
+    }
+
+    @Test
+    void severalStuckJobs_reclaimStuckJobs_eachGetsItsOwnOutcome() {
+        Job retryable = processingJob(1, 3, Instant.now().minusSeconds(120));
+        Job exhausted = processingJob(3, 3, Instant.now().minusSeconds(120));
+        Job healthy = processingJob(1, 3, Instant.now().minusSeconds(5));
+        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of(retryable, exhausted, healthy));
+
+        processor.reclaimStuckJobs();
+
+        verify(repository, times(1)).reschedule(eq(retryable.id()), eq(retryable.updatedAt()), any());
+        verify(repository, times(1)).markDead(exhausted.id(), exhausted.updatedAt());
+        verify(repository, never()).reschedule(eq(healthy.id()), any(), any());
+        verify(repository, never()).markDead(eq(healthy.id()), any());
+    }
+
+    @Test
+    void anyOutcome_reclaimStuckJobs_neverClaimsJobs() {
+        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
+
+        processor.reclaimStuckJobs();
+
+        verify(repository, never()).claimNext();
+    }
+
+    // ---- helpers ------------------------------------------------------------------------------------
 
     private Job processingJob(int currentAttempts, int maxAttempts, Instant updatedAt) {
         Instant created = Instant.now().minusSeconds(600).truncatedTo(ChronoUnit.MICROS);
@@ -416,22 +363,24 @@ class JobProcessorTest {
                 base.runAfter(), base.createdAt(), base.updatedAt());
     }
 
-    private Job pendingJobDueAt(Instant runAfter) {
-        Instant created = Instant.now().minusSeconds(120).truncatedTo(ChronoUnit.MICROS);
-        return new Job(UUID.randomUUID(), "email", "{}", Pending.getInstance(), 0, 3, runAfter, created, created);
-    }
-
     private Job pendingJob(int maxAttempts) {
         Instant past = Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MICROS);
         return new Job(UUID.randomUUID(), "email", "{}", Pending.getInstance(), 0, maxAttempts, past, past, past);
     }
 
+    /** The same job is claimed on every call; each call gets the next fresh job from updateAttempts. */
     private void stubFlow(Job job, Job first, Job... rest) {
-        when(repository.listJobsByStatus(Processing.getInstance())).thenReturn(List.of());
-        when(repository.listJobsByStatus(Pending.getInstance())).thenReturn(List.of(job));
-        when(repository.claim(any())).thenReturn(List.of(job));
+        when(repository.claimNext()).thenReturn(List.of(job));
         when(repository.updateAttempts(job.id())).thenReturn(first, rest);
         when(registry.getHandler("EMAIL")).thenReturn(handler);
+    }
+
+    /** Call 1 claims the first job, call 2 the second, and so on. */
+    private void stubClaimSequence(Job first, Job... rest) {
+        OngoingStubbing<List<Job>> claims = when(repository.claimNext()).thenReturn(List.of(first));
+        for (Job next : rest) {
+            claims = claims.thenReturn(List.of(next));
+        }
     }
 
     private static Job withAttempts(Job j, int attempts) {

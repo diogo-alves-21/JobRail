@@ -3,16 +3,11 @@
 * JobRail - Distributed Job Queue
 * All rights reserved.
 */
-package org.jobrail.api;
+package org.jobrail.core.exceptions;
 
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
-import org.jobrail.api.dto.ErrorResponse;
-import org.jobrail.core.exceptions.InvalidJobStatusException;
-import org.jobrail.core.exceptions.JobNotFoundException;
-import org.jobrail.core.exceptions.QueueJobException;
-import org.jobrail.core.exceptions.RequeueJobException;
 
 public class ApiExceptionMappers {
 
