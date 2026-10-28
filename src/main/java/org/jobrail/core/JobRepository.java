@@ -20,7 +20,7 @@ public interface JobRepository {
 
     Job store(Job job);
 
-    List<Job> claim(List<Job> jobs);
+    List<Job> claimNext();
 
     void markSucceeded(UUID id);
 

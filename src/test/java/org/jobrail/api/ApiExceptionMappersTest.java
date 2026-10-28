@@ -9,11 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import org.jobrail.api.dto.ErrorResponse;
-import org.jobrail.core.exceptions.InvalidJobStatusException;
-import org.jobrail.core.exceptions.JobNotFoundException;
-import org.jobrail.core.exceptions.QueueJobException;
-import org.jobrail.core.exceptions.RequeueJobException;
+import org.jobrail.core.exceptions.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

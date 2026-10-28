@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.hibernate.Timeouts.SKIP_LOCKED_MILLI;
+
 @RequiredArgsConstructor
 @ApplicationScoped
 public class JobPersistenceAdapter implements JobRepository {
@@ -54,17 +56,17 @@ public class JobPersistenceAdapter implements JobRepository {
 
     @Override
     @Transactional(Transactional.TxType.REQUIRED)
-    public List<Job> claim(List<Job> jobs) {
-        List<UUID> ids = jobs.stream().map(Job::id).toList();
+    public List<Job> claimNext() {
         List<JobEntity> entities = repositoryBase.getEntityManager()
-                .createQuery("FROM JobEntity WHERE id IN :ids AND status = :status", JobEntity.class)
-                .setParameter("ids", ids).setParameter("status", Pending.getInstance())
-                .setLockMode(LockModeType.PESSIMISTIC_WRITE).setHint("jakarta.persistence.lock.timeout", -2)
-                .getResultList();
+                .createQuery("FROM JobEntity WHERE status = :status AND runAfter <= :now order by runAfter, createdAt",
+                        JobEntity.class)
+                .setParameter("status", Pending.getInstance()).setParameter("now", Instant.now()).setMaxResults(1)
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .setHint("jakarta.persistence.lock.timeout", SKIP_LOCKED_MILLI).getResultList();
 
         entities.forEach(entity -> {
             entity.setStatus(Processing.getInstance());
-            entity.setUpdatedAt(Instant.now());
+            entity.setUpdatedAt(Instant.now().truncatedTo(ChronoUnit.MICROS));
         });
 
         return entities.stream().map(jobMapper::toDomain).toList();

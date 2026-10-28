@@ -3,7 +3,7 @@
 * JobRail - Distributed Job Queue
 * All rights reserved.
 */
-package org.jobrail.api.dto;
+package org.jobrail.core.exceptions;
 
 public record ErrorResponse(String message) {
 }

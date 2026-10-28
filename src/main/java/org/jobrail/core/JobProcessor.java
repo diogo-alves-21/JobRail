@@ -5,11 +5,9 @@
 */
 package org.jobrail.core;
 
-import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.RequiredArgsConstructor;
 import org.jobrail.core.exceptions.HandleJobException;
-import org.jobrail.core.jobstatuses.Pending;
 import org.jobrail.core.jobstatuses.Processing;
 
 import java.time.Duration;
@@ -25,22 +23,18 @@ public class JobProcessor {
     private final JobRepository jobRepository;
     private final JobHandlerRegistry registry;
 
-    @Scheduled(every = "5s")
-    public void process() {
+    public boolean claimAndRunOnce() {
+        List<Job> claimedJobs = jobRepository.claimNext();
+        if (claimedJobs.isEmpty())
+            return false;
 
+        handleEachJob(claimedJobs.getFirst());
+        return true;
+    }
+
+    public void reclaimStuckJobs() {
         jobRepository.listJobsByStatus(Processing.getInstance()).stream().filter(this::filterStuckJobs).toList()
                 .forEach(this::reclaimStuckJob);
-
-        List<Job> pendingJobs = jobRepository.listJobsByStatus(Pending.getInstance()).stream()
-                .filter(j -> j.runAfter().compareTo(Instant.now()) < 0).toList();
-        if (pendingJobs.isEmpty())
-            return;
-
-        List<Job> claimedJobs = jobRepository.claim(pendingJobs);
-        if (claimedJobs.isEmpty())
-            return;
-
-        handleJobs(claimedJobs);
     }
 
     private boolean filterStuckJobs(Job j) {
@@ -55,10 +49,6 @@ public class JobProcessor {
         } else {
             jobRepository.markDead(job.id(), job.updatedAt());
         }
-    }
-
-    private void handleJobs(List<Job> claimedJobs) {
-        claimedJobs.forEach(this::handleEachJob);
     }
 
     private void handleEachJob(Job claimedJob) {
