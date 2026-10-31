@@ -3,7 +3,7 @@
 * JobRail - Distributed Job Queue
 * All rights reserved.
 */
-package org.jobrail.api;
+package org.jobrail.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

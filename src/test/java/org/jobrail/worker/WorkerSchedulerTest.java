@@ -46,7 +46,7 @@ class WorkerSchedulerTest {
         CountDownLatch allArrived = new CountDownLatch(3);
         when(processor.claimAndRunOnce()).thenAnswer(invocation -> {
             allArrived.countDown();
-            allArrived.await(2, TimeUnit.SECONDS); // only returns early if three workers are inside at once
+            allArrived.await(2, TimeUnit.SECONDS);
             return false;
         });
         scheduler = scheduler(true, 3, Duration.ofMillis(50));
@@ -58,7 +58,6 @@ class WorkerSchedulerTest {
 
     @Test
     void workerThatFoundWork_doesNotSleepBeforeAskingAgain() {
-        // poll interval of 2s: if the worker slept after each job, only one call would happen within the 1s window
         when(processor.claimAndRunOnce()).thenReturn(true, true, true, true, true, false);
         scheduler = scheduler(true, 1, Duration.ofSeconds(2));
 
@@ -75,7 +74,6 @@ class WorkerSchedulerTest {
         scheduler.onStart(null);
         Thread.sleep(1000);
 
-        // ~4 polls fit in a second (at 0, 300, 600, 900 ms); a worker that never slept would make thousands
         verify(processor, atLeast(2)).claimAndRunOnce();
         verify(processor, atMost(6)).claimAndRunOnce();
     }

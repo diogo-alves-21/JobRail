@@ -9,7 +9,6 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 
 import java.util.Map;
 
-/** Turns the worker pool on for the tests that need it; every other test runs with it off. */
 public class WorkersEnabledProfile implements QuarkusTestProfile {
 
     @Override
