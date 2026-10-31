@@ -31,8 +31,6 @@ class JobProcessorTest {
     private final JobHandler handler = mock(JobHandler.class);
     private final JobProcessor processor = new JobProcessor(repository, registry);
 
-    // ---- claimAndRunOnce: outcome of a single claimed job -------------------------------------------
-
     @Test
     void handlerSucceeds_claimAndRunOnce_jobIsMarkedAsSucceededOneTime() {
         Job job = pendingJob(3);
@@ -173,8 +171,6 @@ class JobProcessorTest {
         assertTrue(processor.claimAndRunOnce());
     }
 
-    // ---- claimAndRunOnce: nothing to claim ----------------------------------------------------------
-
     @Test
     void nothingToClaim_claimAndRunOnce_returnsFalseAndTouchesNothing() {
         when(repository.claimNext()).thenReturn(List.of());
@@ -195,8 +191,6 @@ class JobProcessorTest {
 
         verify(repository, never()).listJobsByStatus(any());
     }
-
-    // ---- claimAndRunOnce: one job per call, so a bad job must not affect the next call --------------
 
     @Test
     void oneJobFails_claimAndRunOnce_nextCallStillHandlesTheNextJob() {
@@ -245,8 +239,6 @@ class JobProcessorTest {
         verify(repository, times(1)).markSucceeded(payment.id());
     }
 
-    // ---- claimAndRunOnce: missing handler -----------------------------------------------------------
-
     @Test
     void noHandlerRegisteredForType_claimAndRunOnce_jobIsMarkedDeadImmediately() {
         Job job = pendingJobOfType("unknown");
@@ -284,8 +276,6 @@ class JobProcessorTest {
         verify(repository, never()).markDead(eq(email.id()), any());
     }
 
-    // ---- reclaimStuckJobs ---------------------------------------------------------------------------
-
     @Test
     void processingJobWithinTimeout_reclaimStuckJobs_isLeftAlone() {
         Job healthy = processingJob(1, 3, Instant.now().minusSeconds(10));
@@ -308,7 +298,6 @@ class JobProcessorTest {
 
         ArgumentCaptor<Instant> runAfter = ArgumentCaptor.forClass(Instant.class);
         verify(repository, times(1)).reschedule(eq(stuck.id()), eq(stuck.updatedAt()), runAfter.capture());
-        // the crashed attempt is already counted in currentAttempts, so the next one is currentAttempts + 1
         assertFalse(runAfter.getValue().isBefore(before.plus(Backoff.runAfter(2))));
         assertFalse(runAfter.getValue().isAfter(after.plus(Backoff.runAfter(2))));
         verify(repository, never()).markDead(any(), any());
@@ -349,8 +338,6 @@ class JobProcessorTest {
         verify(repository, never()).claimNext();
     }
 
-    // ---- helpers ------------------------------------------------------------------------------------
-
     private Job processingJob(int currentAttempts, int maxAttempts, Instant updatedAt) {
         Instant created = Instant.now().minusSeconds(600).truncatedTo(ChronoUnit.MICROS);
         return new Job(UUID.randomUUID(), "email", "{}", Processing.getInstance(), currentAttempts, maxAttempts,
@@ -368,14 +355,12 @@ class JobProcessorTest {
         return new Job(UUID.randomUUID(), "email", "{}", Pending.getInstance(), 0, maxAttempts, past, past, past);
     }
 
-    /** The same job is claimed on every call; each call gets the next fresh job from updateAttempts. */
     private void stubFlow(Job job, Job first, Job... rest) {
         when(repository.claimNext()).thenReturn(List.of(job));
         when(repository.updateAttempts(job.id())).thenReturn(first, rest);
         when(registry.getHandler("EMAIL")).thenReturn(handler);
     }
 
-    /** Call 1 claims the first job, call 2 the second, and so on. */
     private void stubClaimSequence(Job first, Job... rest) {
         OngoingStubbing<List<Job>> claims = when(repository.claimNext()).thenReturn(List.of(first));
         for (Job next : rest) {

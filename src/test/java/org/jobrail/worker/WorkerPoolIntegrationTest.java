@@ -5,9 +5,6 @@
 */
 package org.jobrail.worker;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -29,7 +26,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/** The whole pool against the real database: started workers drain the queue and no job is handled twice. */
+import static org.junit.jupiter.api.Assertions.*;
+
 @Tag("integration")
 @QuarkusTest
 @TestProfile(WorkersEnabledProfile.class)
@@ -77,6 +75,6 @@ class WorkerPoolIntegrationTest {
             }
             Thread.sleep(100);
         }
-        assertTrue(false, "the worker pool did not drain the queue within 30s");
+        fail("the worker pool did not drain the queue within 30s");
     }
 }

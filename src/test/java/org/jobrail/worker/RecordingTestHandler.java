@@ -14,10 +14,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Deterministic handler for tests: always succeeds and records how many times each job id was handled. The real Email
- * and Payment handlers fail at random, which would make retries (and the backoff delays) leak into the test.
- */
 @ApplicationScoped
 public class RecordingTestHandler implements JobHandler {
 
