@@ -8,6 +8,7 @@ package org.jobrail.infrastructure;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.Tuple;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.jobrail.core.Job;
@@ -18,8 +19,10 @@ import org.jobrail.core.jobstatuses.*;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.hibernate.Timeouts.SKIP_LOCKED_MILLI;
 
@@ -121,5 +124,15 @@ public class JobPersistenceAdapter implements JobRepository {
         jobEntity.setStatus(Pending.getInstance());
         jobEntity.setRunAfter(Instant.now());
         jobEntity.setUpdatedAt(Instant.now());
+    }
+
+    @Override
+    public Map<JobStatus, Long> countJobsByStatus() {
+        return repositoryBase.getEntityManager().createQuery("""
+                select j.status as status, count(j) as total
+                from JobEntity j
+                group by j.status
+                """, Tuple.class).getResultStream().collect(
+                Collectors.toMap(row -> row.get("status", JobStatus.class), row -> row.get("total", Long.class)));
     }
 }

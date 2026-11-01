@@ -7,6 +7,7 @@ package org.jobrail.core;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,4 +32,6 @@ public interface JobRepository {
     Job updateAttempts(UUID id);
 
     void updateForRequeue(UUID id);
+
+    Map<JobStatus, Long> countJobsByStatus();
 }
