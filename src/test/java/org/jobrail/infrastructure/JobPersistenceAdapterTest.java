@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -163,6 +164,36 @@ public class JobPersistenceAdapterTest {
         Job result = jobPersistenceAdapter.findByIdOptional(id).orElseThrow();
         assertEquals(1, result.currentAttempts());
         assertTrue(result.updatedAt().isAfter(old.plusSeconds(60)));
+    }
+
+    @Test
+    @TestTransaction
+    void jobsInSeveralStatuses_countJobsByStatus_groupsAndCountsThem() {
+        Map<JobStatus, Long> before = jobPersistenceAdapter.countJobsByStatus();
+        jobPersistenceAdapter.store(createJob("email", Pending.getInstance()));
+        jobPersistenceAdapter.store(createJob("email", Pending.getInstance()));
+        jobPersistenceAdapter.store(createJob("email", Pending.getInstance()));
+        jobPersistenceAdapter.store(createJob("email", Dead.getInstance()));
+        jobPersistenceAdapter.store(createJob("email", Succeeded.getInstance()));
+        jobPersistenceAdapter.store(createJob("email", Succeeded.getInstance()));
+
+        Map<JobStatus, Long> after = jobPersistenceAdapter.countJobsByStatus();
+
+        assertEquals(3L,
+                after.getOrDefault(Pending.getInstance(), 0L) - before.getOrDefault(Pending.getInstance(), 0L));
+        assertEquals(1L, after.getOrDefault(Dead.getInstance(), 0L) - before.getOrDefault(Dead.getInstance(), 0L));
+        assertEquals(2L,
+                after.getOrDefault(Succeeded.getInstance(), 0L) - before.getOrDefault(Succeeded.getInstance(), 0L));
+        assertEquals(before.getOrDefault(Processing.getInstance(), 0L),
+                after.getOrDefault(Processing.getInstance(), 0L));
+    }
+
+    @Test
+    @TestTransaction
+    void statusWithNoJobs_countJobsByStatus_isAbsentFromTheMap() {
+        // zero-filling is the query's job (GetJobsStats); the repository reports only what exists
+        Map<JobStatus, Long> counts = jobPersistenceAdapter.countJobsByStatus();
+        counts.values().forEach(count -> assertTrue(count > 0));
     }
 
     private Job createJob(String type, JobStatus status) {

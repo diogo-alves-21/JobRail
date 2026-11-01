@@ -9,7 +9,10 @@ import org.jobrail.core.exceptions.InvalidJobStatusException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @Tag("unit")
@@ -27,6 +30,18 @@ public class JobStatusRegistryTest {
                 () -> JobStatusRegistry.fromName("INVALID_STATUS"));
 
         assertEquals("Unknown job status: INVALID_STATUS", exception.getMessage());
+    }
+
+    @Test
+    void all_returnsEveryStatusInLifecycleOrder() {
+        List<String> names = JobStatusRegistry.all().stream().map(JobStatus::getName).toList();
+
+        assertEquals(List.of("PENDING", "PROCESSING", "SUCCEEDED", "DEAD"), names);
+    }
+
+    @Test
+    void everyStatusInAll_fromName_roundTrips() {
+        JobStatusRegistry.all().forEach(status -> assertSame(status, JobStatusRegistry.fromName(status.getName())));
     }
 
     @Test

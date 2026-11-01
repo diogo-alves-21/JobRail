@@ -8,9 +8,11 @@ package org.jobrail.api;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
+import org.jobrail.api.dto.JobsStatsResponseDTO;
 import org.jobrail.api.dto.QueueJobDTO;
 import org.jobrail.core.*;
 import org.jobrail.core.queries.GetJob;
+import org.jobrail.core.queries.GetJobsStats;
 import org.jobrail.core.queries.ListJobs;
 
 import java.util.List;
@@ -24,6 +26,7 @@ public class JobResource {
     private final GetJob getJob;
     private final ListJobs listJobs;
     private final JobRequeue jobRequeue;
+    private final GetJobsStats getJobsStats;
 
     @POST
     @Path("")
@@ -51,5 +54,11 @@ public class JobResource {
     public Response requeueJob(@PathParam("id") UUID id) {
         UUID jobId = jobRequeue.requeue(id);
         return Response.ok(jobId).build();
+    }
+
+    @GET
+    @Path("/stats")
+    public Response getJobsStats() {
+        return Response.ok(JobsStatsResponseDTO.from(getJobsStats.query())).build();
     }
 }

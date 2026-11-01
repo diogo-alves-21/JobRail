@@ -182,6 +182,42 @@ class JobResourceTest {
                 containsString(unknown.toString()));
     }
 
+    // ---- GET /api/jobs/stats --------------------------------------------------------------------
+
+    @Test
+    void noJobs_getStats_returns200WithEveryStatusAtZero() {
+        given().when().get(JOBS + "/stats").then().statusCode(200).contentType(ContentType.JSON)
+                .body("groupedStats.size()", is(4)).body("groupedStats.count", everyItem(is(0)));
+    }
+
+    @Test
+    void jobsInSeveralStatuses_getStats_returnsTheCountForEachStatus() {
+        seed(Pending.getInstance(), 0, 3);
+        seed(Pending.getInstance(), 0, 3);
+        seed(Dead.getInstance(), 3, 3);
+        seed(Succeeded.getInstance(), 1, 3);
+
+        given().when().get(JOBS + "/stats").then().statusCode(200)
+                .body("groupedStats.find { it.statusName == 'PENDING' }.count", equalTo(2))
+                .body("groupedStats.find { it.statusName == 'DEAD' }.count", equalTo(1))
+                .body("groupedStats.find { it.statusName == 'SUCCEEDED' }.count", equalTo(1))
+                .body("groupedStats.find { it.statusName == 'PROCESSING' }.count", equalTo(0));
+    }
+
+    @Test
+    void anyJobs_getStats_listsTheStatusesInLifecycleOrder() {
+        seed(Dead.getInstance(), 3, 3);
+
+        given().when().get(JOBS + "/stats").then().statusCode(200).body("groupedStats.statusName",
+                contains("PENDING", "PROCESSING", "SUCCEEDED", "DEAD"));
+    }
+
+    @Test
+    void statsPath_getStats_isNotMistakenForAJobId() {
+        // /api/jobs/{id} would answer 404 (or 400) for "stats"; the literal path must win
+        given().when().get(JOBS + "/stats").then().statusCode(200);
+    }
+
     private static Map<String, Object> newJob(String type, String payload, int maxAttempts) {
         return Map.of("type", type, "payload", payload, "maxAttempts", maxAttempts);
     }
