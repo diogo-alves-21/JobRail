@@ -14,6 +14,33 @@ You can run your application in dev mode that enables live coding using:
 
 > **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
 
+## Configuration
+
+| Variable                        | Default                                      | Notes                                         |
+|---------------------------------|----------------------------------------------|-----------------------------------------------|
+| `PORT`                          | `8080`                                       | HTTP port. Railway injects it.                |
+| `JOBRAIL_DATASOURCE_URL`        | `jdbc:postgresql://localhost:5432/jobrail-dev` | Must be a **JDBC** URL, not `postgres://`.    |
+| `JOBRAIL_DATASOURCE_USERNAME`   | `jobrail`                                    |                                               |
+| `JOBRAIL_DATASOURCE_PASSWORD`   | *(none, required)*                           | Startup fails without it. Local: put it in `.env`. |
+| `JOBRAIL_TEST_DATASOURCE_URL`   | `jdbc:postgresql://localhost:5433/jobrail-test` | Tests only. `docker compose up -d postgres-test`. |
+| `JOBRAIL_TEST_DATASOURCE_PASSWORD` | *(none, required)*                        | Tests only. Local: put it in `.env`, same value the test container is created with. |
+
+Health: `GET /q/health/live` and `GET /q/health/ready` (readiness includes the database check).
+
+### Railway
+
+Railway's Postgres exposes `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` and `PGPASSWORD` (plus a
+`postgres://` `DATABASE_URL`, which the JDBC driver cannot use). On the app service, build the
+variables from references to the Postgres service:
+
+```
+JOBRAIL_DATASOURCE_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
+JOBRAIL_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
+JOBRAIL_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
+```
+
+Set the service's healthcheck path to `/q/health/ready`.
+
 ## Packaging and running the application
 
 The application can be packaged using:
