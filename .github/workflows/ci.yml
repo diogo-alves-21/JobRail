@@ -15,20 +15,6 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: jobrail-test
-          POSTGRES_USER: jobrail
-          POSTGRES_PASSWORD: jobrail
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U jobrail -d jobrail-test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -36,6 +22,21 @@ jobs:
           distribution: temurin
           java-version: 25
           cache: maven
+      - name: Start test database
+        run: |
+          password=$(openssl rand -hex 16)
+          echo "::add-mask::$password"
+          echo "JOBRAIL_TEST_DATASOURCE_PASSWORD=$password" >> "$GITHUB_ENV"
+          docker run -d --name test-db -p 5433:5432 \
+            -e POSTGRES_DB=jobrail-test -e POSTGRES_USER=jobrail -e POSTGRES_PASSWORD="$password" \
+            --health-cmd "pg_isready -U jobrail -d jobrail-test" --health-interval 3s --health-retries 20 \
+            postgres:16
+          for i in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' test-db)" = healthy ] && exit 0
+            sleep 2
+          done
+          echo "test database did not become healthy" >&2
+          exit 1
       - run: mvn -B verify
 
   build:
